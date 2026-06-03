@@ -1,0 +1,66 @@
+\documentclass[journal,onecolumn]{IEEEtran}
+
+\usepackage{cite}
+\usepackage{amsmath}
+
+\begin{document}
+
+\title{EEC289Q Project Proposal: Efficient Power Analysis Resilience for Neural Networks}
+
+\author{Luna~Park,
+        Anjani~Gadkari
+}
+
+% make the title area
+\maketitle
+\section{Problem and Motivation}
+Deep neural network (DNN) models are increasingly deployed into security-critical domains including fraud detection and malware 
+identification~\cite{alarfajCreditCardFraud2022, vinayakumarRobustIntelligentMalware2019}. This motivates adversaries to locate DNN 
+vulnerabilities through model extraction and weight stealing~\cite{chakrabortySurveyAdversarialAttacks2021,rakinDeepStealAdvancedModel2022}. Recent literature has proven that DNN hardware is vulernable to power 
+analysis side channel attacks(SCA), which allows adversaries to perform weight stealing on such 
+models~\cite{majiLeakyNetsRecovering2021}. While there is significant research in the domain of power analysis resilient hardware, 
+established implementations are generally dedicated to protecting cryptographic 
+operations~\cite{heHowSecureYour2017,zhaoSideChannelSecurity2023,srivastavaSCARPowerSideChannel2024a}. These algorithms, such as 
+AES, require precise comuputation to follow well-established standardizations, which then incurs significant overhead when protecting. 
+In contrast, machine learning models are robust to errors in data and computation. This allows approximate computing paradigms to make 
+significant improvements in hardware size, performance, and energy usage with minimal loss in accuracy. 
+
+One of the most effective techniques which takes advantage of this tolerance is quantization. Quantization for DNN's reduces 
+the bit size of weights and activations, thereby reducing the precision but increasing efficiency when deployed~\cite{rokhComprehensiveSurveyModel2023}. Binarized
+Neural Networks (BNNs) are the most efficient form of quantization, constraining weights and activations to a single bit such
+that $w, a \in \{-1, 1\}$~\cite{courbariauxBinarizedNeuralNetworks2016}. The single bit nature of BNNs then enables new hardware designs for inference—for example, 
+BNN multiplication can be performed with a single XNOR. In this project, we want to exploit the mathematical properties of BNNs
+to build power SCA resistant neural network hardware which requires minimal overhead.
+
+
+\section{Design Choices}
+Our design focuses on prioritizing a lightweight and secure architecture for accelerators by utilizing BNNs. 
+By using single-bit weights and activations, BNNs significantly reduce memory requirements and computation complexity, 
+and can be implemented on resource-constrained hardware. To ensure resistance against SCA attacks, we will implement 
+gate-level masking during MAC operations. In this method, every sensitive bit is split into two or more shares such that 
+$$x = x_1 \oplus x_2,$$
+where $x_1$ is a randomly generated bit. In BNNs, MAC operations can be performed solely through XNOR and AND gates. 
+Because the XNOR operation is linear, shares can be processed independently of each other~\cite{trichinaSmallSizeLow2005}. For two secret bits $a$ and $b$
+and the operation $z = a \odot b$, the value can be calculated as follows: 
+$$z=(a_1 \oplus a_2)\odot(b_1 \oplus b_2) = \overline{(a_1 \oplus b_1)} \oplus (a_2 \oplus b_2).$$
+However, AND gates are non-linear, and processing the operation results in shares appearing across multiple terms:
+$$z=(a_1 \oplus a_2)\cdot(b_1 \oplus b_2) = (a_1 \cdot b_1) \oplus (a_1 \cdot b_2) \oplus (a_2 \cdot b_1) \oplus (a_2 \cdot b_2)$$
+
+Terms that contain both the secret share bits and masks such as $a_1 \cdot b_2$ are prone to leaking the value of the secret bit. 
+To mitigate this, we replace the standard AND-gates with a glitch-resistant implementation of Trichina AND gates~\cite{dubeyBoMaNetBooleanMasking2020}. This implementation 
+processes shares with additional random bits to ensure that intermediate computations remain independent of the secret bits, while also
+addressing the information leakage present in Trichina's original implementation~\cite{nikovaThresholdImplementationsSideChannel2006}. 
+
+\section{Evaluation Methodology}
+Our first milestone will be to design RTL code for a standard BNN MAC without masking, a MAC which masks the multiply operation, 
+and a MAC which fully masks the multiply and accumulate operations. Then, our next milestone will be to benchmark the resource utilization
+of the hardware designs by compiling each module for synthesis. For this evaluation, we will record the hardware resource usage, energy usage,
+and performance of each module. Our final milestone is then to load our module bitstreams onto a an iCE40 FPGA, where they will run in parallel.
+We will then use a ChipWhisperer-Husky to run power analysis on each module, where we will perform test vector leakage assessments as well 
+as correlation power analysis (CPA) to evaluate the efficacy of masking the weights in each design.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}
+

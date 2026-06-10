@@ -1,11 +1,11 @@
-module mac_unmasked #(
+module xnor_popcnt #(
     parameter N=8
 )(
     input wire clk,
-    input wire rst,
+    input wire rstn,
     input wire [N-1:0] act,
     input wire [N-1:0] wt,
-    output reg [$clog2(N+1)-1:0] mac_out
+    output reg [$clog2(N+1)-1:0] out
 );
 
 //xnor
@@ -23,11 +23,11 @@ module mac_unmasked #(
         end
     end
 
-    always @(posedge clk or posedge rst) begin
-        if (rst) begin
-            mac_out <= 0;
+    always @(posedge clk or negedge rstn) begin
+        if (!rstn) begin
+            out <= 0;
         end else begin
-            mac_out <= popcnt;
+            out <= popcnt;
         end
     end
 endmodule

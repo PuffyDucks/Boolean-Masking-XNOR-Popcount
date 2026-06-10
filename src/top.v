@@ -7,7 +7,8 @@ module top (
     output wire iCE40CW312_TX
 );
 
-localparam CHAR_n = 8'h6E;
+localparam CHAR_a = 8'h61;
+localparam CHAR_w = 8'h77;
 localparam CHAR_o = 8'h6F;
 
 wire        rx_valid;
@@ -36,14 +37,49 @@ simpleserial_iface #(
     .tx_busy (tx_busy)
 );
 
+localparam RECV_A  = 2'd0,
+           RECV_W  = 2'd1,
+           CALC_O  = 2'd2,
+           SEND_O  = 2'd3;
+
+reg  [1:0] state = 2'd0;
+reg  [7:0] a_buf;
+reg  [7:0] w_buf;
+wire [3:0] out;
+
+xnor_popcnt #(
+    .N(8)
+) u_xnor_popcnt (
+    .clk  (iCE40CW312_CLK),
+    .rstn (1'b1),
+    .act  (a_buf),
+    .wt   (w_buf),
+    .out  (out)
+);
 
 always @(posedge iCE40CW312_CLK) begin
     tx_valid <= 1'b0;
-    if (rx_valid && rx_cmd == CHAR_n && !tx_busy) begin
-        tx_cmd   <= CHAR_o;
-        tx_data  <= ~rx_data;
-        tx_valid <= 1'b1;
-    end
+    case (state)
+        RECV_A:
+            if (rx_valid && rx_cmd == CHAR_a) begin
+                a_buf <= rx_data;
+                state <= RECV_W;
+            end
+        RECV_W:
+            if (rx_valid && rx_cmd == CHAR_w) begin
+                w_buf <= rx_data;
+                state <= CALC_O;
+            end
+        CALC_O:
+            state <= SEND_O;
+        SEND_O: 
+            if (!tx_busy) begin
+                tx_cmd   <= CHAR_o;
+                tx_data  <= {4'd0, out};
+                tx_valid <= 1'b1;
+                state <= RECV_A;
+            end
+    endcase
 end
 
 endmodule

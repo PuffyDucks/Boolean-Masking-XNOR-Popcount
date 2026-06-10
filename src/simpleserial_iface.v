@@ -17,7 +17,6 @@ module simpleserial_iface #(
     input  wire  [7:0] tx_cmd,
     input  wire  [7:0] tx_data,
     output wire        tx_busy,
-    output wire debug
 );
 
 // uart_rx -> ss_rx
@@ -28,7 +27,6 @@ wire  [7:0] ss_rx_data;
 wire        ss_tx_valid;
 wire  [7:0] ss_tx_data;
 wire        uart_tx_busy;
-assign debug = ss_rx_valid;
 uart_rx #(
     .CLK_FREQ(CLK_FREQ),
     .BAUD    (BAUD)

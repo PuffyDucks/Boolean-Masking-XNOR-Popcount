@@ -16,7 +16,7 @@ module simpleserial_iface #(
     input  wire        tx_valid,
     input  wire  [7:0] tx_cmd,
     input  wire  [7:0] tx_data,
-    output wire        tx_busy,
+    output wire        tx_busy
 );
 
 // uart_rx -> ss_rx

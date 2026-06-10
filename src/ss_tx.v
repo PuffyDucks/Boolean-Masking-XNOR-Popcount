@@ -22,7 +22,7 @@ localparam IDLE      = 3'd0,
 
 localparam CHAR_NEWLINE = 8'h0A;// '\n'
 
-reg [2:0] state;
+reg [2:0] state = 2'd0;
 reg [7:0] cmd_buf;
 reg [7:0] data_buf;
 

@@ -28,7 +28,7 @@ localparam IDLE  = 2'd0,
            DATA  = 2'd2,
            STOP  = 2'd3;
 
-reg [1:0] state;
+reg [1:0] state = 2'd0;
 reg [8:0] down_timer;
 reg [2:0] bit_count;
 reg [7:0] data_fifo;

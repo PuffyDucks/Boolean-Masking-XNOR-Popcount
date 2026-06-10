@@ -1,32 +1,37 @@
-PROJ      = module
-TOP       = top_unmasked
 DEVICE    = up5k
 PACKAGE   = uwg30
-
 BUILD_DIR = build
-
 SRCS      = $(wildcard ./src/*.v) $(wildcard ./src/*/*.v)
 PCF       = ./src/constraints.pcf
 
-JSON      = $(BUILD_DIR)/$(PROJ).json
-ASC       = $(BUILD_DIR)/$(PROJ).asc
-BIN       = $(BUILD_DIR)/$(PROJ).bin
+BINS = $(BUILD_DIR)/xnor_popcount_unmasked.bin $(BUILD_DIR)/xnor_popcount_masked_xnor.bin
 
 .PHONY: all sim clean
 
-all: $(BIN)
+all: $(BINS)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-$(JSON): $(SRCS) | $(BUILD_DIR)
-	yosys -p "synth_ice40 -top $(TOP) -json $@" $(SRCS)
+$(BUILD_DIR)/xnor_popcount_unmasked.json: $(SRCS) | $(BUILD_DIR)
+	yosys -p "synth_ice40 -top top_unmasked -json $@" $(SRCS)
 
-$(ASC): $(JSON) $(PCF)
+$(BUILD_DIR)/xnor_popcount_unmasked.asc: $(BUILD_DIR)/xnor_popcount_unmasked.json $(PCF)
 	nextpnr-ice40 --$(DEVICE) --package $(PACKAGE) \
-	    --json $(JSON) --pcf $(PCF) --asc $@
+	    --json $< --pcf $(PCF) --asc $@
 
-$(BIN): $(ASC)
+$(BUILD_DIR)/xnor_popcount_unmasked.bin: $(BUILD_DIR)/xnor_popcount_unmasked.asc
+	icepack $< $@
+
+# Masked version
+$(BUILD_DIR)/xnor_popcount_masked_xnor.json: $(SRCS) | $(BUILD_DIR)
+	yosys -p "synth_ice40 -top top_xnor_masked -json $@" $(SRCS)
+
+$(BUILD_DIR)/xnor_popcount_masked_xnor.asc: $(BUILD_DIR)/xnor_popcount_masked_xnor.json $(PCF)
+	nextpnr-ice40 --$(DEVICE) --package $(PACKAGE) \
+	    --json $< --pcf $(PCF) --asc $@
+
+$(BUILD_DIR)/xnor_popcount_masked_xnor.bin: $(BUILD_DIR)/xnor_popcount_masked_xnor.asc
 	icepack $< $@
 
 clean:

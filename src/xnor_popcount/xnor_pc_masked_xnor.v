@@ -2,7 +2,7 @@ module xnor_pc_masked_xnor #(
     parameter N=8
 )(
     input wire clk,
-    input wire rst,
+    input wire rstn,
     input wire [N-1:0] act,
     input wire [N-1:0] wt,
     input wire [N-1:0] a_mask,
@@ -36,8 +36,8 @@ module xnor_pc_masked_xnor #(
         end
     end
 
-    always @(posedge clk or posedge rst) begin
-        if (rst) begin
+    always @(posedge clk or negedge rstn) begin
+        if (!rstn) begin
             out <= 0;
         end else begin
             out <= popcnt;

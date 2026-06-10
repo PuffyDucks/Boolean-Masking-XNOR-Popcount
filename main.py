@@ -68,25 +68,38 @@ def _(time):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Bitstream Flashing
+    ### Bitstream Flashing
     """)
     return
 
 
 @app.cell
-def _(scope):
+def _(bitstream_dropdown, flash_btn, mo, scope):
     from chipwhisperer.hardware.naeusb.programmer_targetfpga import LatticeICE40
+    mo.stop(not flash_btn.value)
     fpga = LatticeICE40(scope)
     fpga.erase_and_init()
-    fpga.program("build/module.bin", sck_speed=20e6, use_fast_usb=True, start=True)
-    print("Bitstream flashed")
+    fpga.program(bitstream_dropdown.value, sck_speed=20e6, use_fast_usb=True, start=True)
+    print(f"Bitstream flashed with {bitstream_dropdown.value}")
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
+    bitstream_dropdown = mo.ui.dropdown(
+        options={"No Masking":"build/xnor_popcount_unmasked.bin", 
+                 "Masked XNOR":"build/xnor_popcount_masked_xnor.bin"},
+        value="No Masking"
+    )
+    flash_btn = mo.ui.run_button(label="Flash")
+    mo.hstack([bitstream_dropdown, flash_btn], justify="start")
+    return bitstream_dropdown, flash_btn
+
+
+@app.cell(hide_code=True)
+def _(mo):
     mo.md(r"""
-    Running Traces
+    ### Capturing Traces
     """)
     return
 
@@ -97,7 +110,7 @@ def _(mo, np, scope, target, xnor_popcount):
     traces = []
     N = 5000
 
-    secret_w = 0x29
+    secret_w = 0xA3
 
     for _ in mo.status.progress_bar(range(N), subtitle='Running trace captures...', 
                                     show_eta=True, show_rate=True):
@@ -123,13 +136,13 @@ def _(mo, np, scope, target, xnor_popcount):
     return N, activations, secret_w, traces
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(N, mo):
     slider = mo.ui.slider(start=0, stop=N-1, label="Trace", value=0, full_width=True)
     return (slider,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo, np, plt, slider, traces):
     xrange = np.arange(len(traces[slider.value]))
     plt.plot(xrange, traces[slider.value])
@@ -142,6 +155,14 @@ def _(mo, np, plt, slider, traces):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Results
+    """)
+    return
+
+
 @app.cell
 def _(activations, np, secret_w, traces, xnor_popcount):
     corr_coeffs = []
@@ -151,14 +172,17 @@ def _(activations, np, secret_w, traces, xnor_popcount):
         (_, _), (r, _) = np.corrcoef(predictions, trace_means)
         corr_coeffs.append(r)
 
-    top_indices = np.argsort(corr_coeffs)[-10:][::-1]
-    top_coeffs = np.array(corr_coeffs)[top_indices]
+    sorted_indices = np.argsort(corr_coeffs)[::-1]
+    extracted_w = sorted_indices[0]
 
-    print(f"Extracted weight: 0x{top_indices[0]:02X}")
+    top_1 = (secret_w == extracted_w)
+    top_5 = (secret_w in sorted_indices[:5])
+
+    print(f"Extracted weight: 0x{extracted_w:02X}")
     print(f"Correct weight: 0x{secret_w:02X}")
-    # print(top_coeffs)
-    # print([f"0x{w:02X}" for w in top_indices])
-
+    print(f"In top 1: {top_1}")
+    print(f"In top 5: {top_5}")
+    print(f"Correct weight index: {(sorted_indices == secret_w).argmax()+1}")
     return
 
 

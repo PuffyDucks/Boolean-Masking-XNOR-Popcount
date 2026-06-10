@@ -50,7 +50,7 @@ wire [3:0] out;
 reg TIO4 = 1'b0;
 assign iCE40CW312_GPIO_O = {TIO4, 1'b0};
 
-xnor_popcnt #(
+xnor_pc #(
     .N(8)
 ) u_xnor_popcnt (
     .clk  (iCE40CW312_CLK),

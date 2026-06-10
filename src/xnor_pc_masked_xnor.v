@@ -1,4 +1,4 @@
-module xnor_masked #(
+module xnor_pc_masked_xnor #(
     parameter N=8
 )(
     input wire clk,

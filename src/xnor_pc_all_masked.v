@@ -1,4 +1,4 @@
-module xnorpopcount_masked #(
+module xnor_pc_all_masked #(
     parameter N = 8
 )(
     input  wire                  clk,
@@ -146,4 +146,3 @@ module xnorpopcount_masked #(
         end
     end
 endmodule
-

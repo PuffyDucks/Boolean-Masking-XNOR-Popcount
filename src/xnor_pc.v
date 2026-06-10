@@ -1,4 +1,4 @@
-module xnor_popcnt #(
+module xnor_pc #(
     parameter N=8
 )(
     input wire clk,

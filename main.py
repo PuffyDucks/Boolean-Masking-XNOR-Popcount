@@ -73,27 +73,33 @@ def _(mo):
     return
 
 
-@app.cell
-def _(bitstream_dropdown, flash_btn, mo, scope):
-    from chipwhisperer.hardware.naeusb.programmer_targetfpga import LatticeICE40
-    mo.stop(not flash_btn.value)
-    fpga = LatticeICE40(scope)
-    fpga.erase_and_init()
-    fpga.program(bitstream_dropdown.value, sck_speed=20e6, use_fast_usb=True, start=True)
-    print(f"Bitstream flashed with {bitstream_dropdown.value}")
-    return
-
-
 @app.cell(hide_code=True)
 def _(mo):
     bitstream_dropdown = mo.ui.dropdown(
-        options={"No Masking":"build/xnor_popcount_unmasked.bin", 
-                 "Masked XNOR":"build/xnor_popcount_masked_xnor.bin"},
-        value="No Masking"
+        options={
+            "No Masking": "build/xnor_popcount_unmasked.bin",
+            "Masked XNOR": "build/xnor_popcount_masked_xnor.bin",
+            "Full Mask": "build/xnor_popcount_all_masked.bin",
+        },
+        value="No Masking",
     )
     flash_btn = mo.ui.run_button(label="Flash")
     mo.hstack([bitstream_dropdown, flash_btn], justify="start")
     return bitstream_dropdown, flash_btn
+
+
+@app.cell
+def _(bitstream_dropdown, flash_btn, mo, scope):
+    mo.stop(not flash_btn.value)
+
+    from chipwhisperer.hardware.naeusb.programmer_targetfpga import LatticeICE40
+
+    fpga = LatticeICE40(scope)
+    fpga.erase_and_init()
+    fpga.program(bitstream_dropdown.value, sck_speed=20e6, use_fast_usb=True, start=True)
+
+    mo.md(f"Flashed `{bitstream_dropdown.value}` to `iCE40UP5K`")
+    return
 
 
 @app.cell(hide_code=True)
@@ -105,14 +111,14 @@ def _(mo):
 
 
 @app.cell
-def _(mo, np, scope, target, xnor_popcount):
+def _(expected, mo, np, scope, target, xnor_popcount):
     activations = []
     traces = []
     N = 5000
 
-    secret_w = 0xA3
+    secret_w = 0x55
 
-    for _ in mo.status.progress_bar(range(N), subtitle='Running trace captures...', 
+    for _ in mo.status.progress_bar(range(N), subtitle='Collecting trace captures...', 
                                     show_eta=True, show_rate=True):
         a = np.random.randint(0, 256, dtype=np.uint8)
 
@@ -126,32 +132,39 @@ def _(mo, np, scope, target, xnor_popcount):
         result = target.simpleserial_read('o', 1, ack=False)
         out = result[0] if result else None
         if (out != xnor_popcount(a, secret_w)):
-            raise ValueError
+            raise ValueError(f"Output mismatch for a=0x{a:02X}: got {out}, expected {expected}")
 
         activations.append(a)
         traces.append(scope.get_last_trace())
 
     activations = np.array(activations)
     traces = np.array(traces)
+
+    mo.md(f"{N} traces captured.")
     return N, activations, secret_w, traces
 
 
 @app.cell(hide_code=True)
 def _(N, mo):
-    slider = mo.ui.slider(start=0, stop=N-1, label="Trace", value=0, full_width=True)
+    slider = mo.ui.slider(start=1, stop=N, label="Trace", value=1, full_width=True)
     return (slider,)
 
 
 @app.cell(hide_code=True)
-def _(mo, np, plt, slider, traces):
-    xrange = np.arange(len(traces[slider.value]))
-    plt.plot(xrange, traces[slider.value])
-    plt.title(f"Power trace {slider.value}")
-    plt.ylabel("ADC Measurement")
-    plt.xlabel("Sample")
-    ax = mo.ui.matplotlib(plt.gca())
+def _(N, mo, np, plt, slider, traces):
+    trace = traces[slider.value-1]
+    xrange = np.arange(len(trace))
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.plot(trace)
+    ax.set_xlabel("Sample")
+    ax.set_ylabel("ADC Measurement")
+    plot = mo.ui.matplotlib(ax)
 
-    mo.vstack([ax, slider])
+    mo.vstack([
+        mo.md(f"### Power trace {slider.value:04d}/{N}"),
+        plot, 
+        slider
+    ], gap="0.75rem",)
     return
 
 
@@ -164,7 +177,7 @@ def _(mo):
 
 
 @app.cell
-def _(activations, np, secret_w, traces, xnor_popcount):
+def _(activations, mo, np, secret_w, traces, xnor_popcount):
     corr_coeffs = []
     for w in range(256):
         predictions = [xnor_popcount(a, w) for a in activations]
@@ -174,15 +187,29 @@ def _(activations, np, secret_w, traces, xnor_popcount):
 
     sorted_indices = np.argsort(corr_coeffs)[::-1]
     extracted_w = sorted_indices[0]
+    top_1 = secret_w == extracted_w
+    top_5 = secret_w in sorted_indices[:5]
+    correct_rank = int((sorted_indices == secret_w).argmax()) + 1
 
-    top_1 = (secret_w == extracted_w)
-    top_5 = (secret_w in sorted_indices[:5])
+    rankings = [
+        {
+            "Rank": i + 1,
+            "Weight (hex)": f"0x{sorted_indices[i]:02X}",
+            "Correlation": f"{corr_coeffs[sorted_indices[i]]:.6f}",
+            "": "Secret weight" if sorted_indices[i] == secret_w else "",
+        } 
+        for i in range(256)
+    ]
 
-    print(f"Extracted weight: 0x{extracted_w:02X}")
-    print(f"Correct weight: 0x{secret_w:02X}")
-    print(f"In top 1: {top_1}")
-    print(f"In top 5: {top_5}")
-    print(f"Correct weight index: {(sorted_indices == secret_w).argmax()+1}")
+    mo.vstack([
+        mo.hstack([
+            mo.stat(f"0x{extracted_w:02X}", label="Extracted weight"),
+            mo.stat(f"#{correct_rank}", label="Correct weight rank", caption=f"0x{secret_w:02X}"),
+            mo.stat("✓" if top_1 else "✗", label="Top-1 match"),
+            mo.stat("✓" if top_5 else "✗", label="Top-5 match"),
+        ], justify="start", gap="1rem"),
+        mo.ui.table(rankings),
+    ])
     return
 
 

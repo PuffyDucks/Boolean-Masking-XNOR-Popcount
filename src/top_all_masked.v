@@ -1,6 +1,6 @@
 `default_nettype none
 
-module top_xnor_masked (
+module top_all_masked (
     input  wire       iCE40CW312_CLK,
     input  wire       iCE40CW312_RX,
     output wire       iCE40CW312_TX,
@@ -41,10 +41,10 @@ trng u_trng (
     .valid    (trng_valid)
 );
 
-wire [15:0] mask_buf;
+wire [31:0] mask_buf;
 wire mask_buf_valid;
 mask_buffer #(
-    .N(16)
+    .N(32)
 ) u_mask_buf (
     .clk(iCE40CW312_CLK),
     .rst_n   (1'b1),
@@ -62,26 +62,33 @@ localparam RECV_A    = 3'd0,
            RECV_W    = 3'd1,
            GET_MASKS = 3'd2,
            CALC_O    = 3'd3,
-           SEND_O    = 3'd4;
+           WAIT_O    = 3'd4,
+           SEND_O    = 3'd5;
 
 reg  [2:0] state = 3'd0;
-reg  [7:0] act_buf, wt_buf;
-reg  [7:0] act, wt, a_mask, w_mask;
-wire [3:0] out;
+reg  [7:0] a_buf;
+reg  [7:0] w_buf;
+reg  [7:0] a_mask, w_mask, r_xnor, r_add;
+wire [$clog2(8+1)-1:0] out;
+wire valid_out;
 
 reg TIO4 = 1'b0;
 assign iCE40CW312_GPIO_O = {TIO4, 1'b0};
 
-xnor_pc_masked_xnor #(
+xnor_pc_all_masked #(
     .N(8)
 ) u_xnor_popcnt (
-    .clk    (iCE40CW312_CLK),
-    .rst_n   (1'b1),
-    .act    (act),
-    .wt     (wt),
-    .a_mask (a_mask),
-    .w_mask (w_mask),
-    .out    (out)
+    .clk      (iCE40CW312_CLK),
+    .rst_n    (1'b1),
+    .valid_in (state == CALC_O),
+    .act      (a_buf),
+    .wt       (w_buf),
+    .a_mask   (a_mask),
+    .w_mask   (w_mask),
+    .r_xnor   (r_xnor),
+    .r_add    (r_add),
+    .valid_out(valid_out),
+    .out      (out)
 );
 
 always @(posedge iCE40CW312_CLK) begin
@@ -90,28 +97,32 @@ always @(posedge iCE40CW312_CLK) begin
     case (state)
         RECV_A:
             if (rx_valid && rx_cmd == CHAR_a) begin
-                act_buf <= rx_data;
-                state   <= RECV_W;
+                a_buf <= rx_data;
+                state <= RECV_W;
             end
         RECV_W:
             if (rx_valid && rx_cmd == CHAR_w) begin
-                wt_buf <= rx_data;
-                state  <= GET_MASKS;
+                w_buf <= rx_data;
+                state <= GET_MASKS;
             end
         GET_MASKS:
             if (mask_buf_valid) begin
                 TIO4   <= 1'b1;
                 state  <= CALC_O;
-                act    <= act_buf;
-                wt     <= wt_buf;
                 a_mask <= mask_buf[7:0];
                 w_mask <= mask_buf[15:8];
+                r_xnor <= mask_buf[23:16];
+                r_add  <= mask_buf[31:24];
             end
         CALC_O: begin
-            state <= SEND_O;
+            state <= WAIT_O;
             TIO4  <= 1'b0;
         end
-        SEND_O: 
+        WAIT_O:
+            if (valid_out) begin
+                state <= SEND_O;
+            end
+        SEND_O:
             if (!tx_busy) begin
                 tx_cmd   <= CHAR_o;
                 tx_data  <= {4'd0, out};

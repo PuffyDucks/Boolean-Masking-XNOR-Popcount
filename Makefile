@@ -4,7 +4,7 @@ BUILD_DIR = build
 SRCS      = $(wildcard ./src/*.v) $(wildcard ./src/*/*.v)
 PCF       = ./src/constraints.pcf
 
-BINS = $(BUILD_DIR)/xnor_popcount_unmasked.bin $(BUILD_DIR)/xnor_popcount_masked_xnor.bin
+BINS = $(BUILD_DIR)/xnor_popcount_unmasked.bin $(BUILD_DIR)/xnor_popcount_masked_xnor.bin $(BUILD_DIR)/xnor_popcount_all_masked.bin
 
 .PHONY: all sim clean
 
@@ -32,6 +32,17 @@ $(BUILD_DIR)/xnor_popcount_masked_xnor.asc: $(BUILD_DIR)/xnor_popcount_masked_xn
 	    --json $< --pcf $(PCF) --asc $@
 
 $(BUILD_DIR)/xnor_popcount_masked_xnor.bin: $(BUILD_DIR)/xnor_popcount_masked_xnor.asc
+	icepack $< $@
+
+# All masked version (with dynamic TRNG masks)
+$(BUILD_DIR)/xnor_popcount_all_masked.json: $(SRCS) | $(BUILD_DIR)
+	yosys -p "synth_ice40 -top top_all_masked -json $@" $(SRCS)
+
+$(BUILD_DIR)/xnor_popcount_all_masked.asc: $(BUILD_DIR)/xnor_popcount_all_masked.json $(PCF)
+	nextpnr-ice40 --$(DEVICE) --package $(PACKAGE) \
+	    --json $< --pcf $(PCF) --asc $@
+
+$(BUILD_DIR)/xnor_popcount_all_masked.bin: $(BUILD_DIR)/xnor_popcount_all_masked.asc
 	icepack $< $@
 
 clean:

@@ -2,7 +2,7 @@ module xnor_pc #(
     parameter N=8
 )(
     input wire clk,
-    input wire rstn,
+    input wire rst_n,
     input wire [N-1:0] act,
     input wire [N-1:0] wt,
     output reg [$clog2(N+1)-1:0] out
@@ -23,8 +23,8 @@ module xnor_pc #(
         end
     end
 
-    always @(posedge clk or negedge rstn) begin
-        if (!rstn) begin
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
             out <= 0;
         end else begin
             out <= popcnt;

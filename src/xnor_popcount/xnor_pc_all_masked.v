@@ -2,7 +2,7 @@ module xnor_pc_all_masked #(
     parameter N = 8
 )(
     input  wire                  clk,
-    input  wire                  rst,
+    input  wire                  rst_n,
     input  wire                  valid_in,
     input  wire [N-1:0]          act,
     input  wire [N-1:0]          wt,
@@ -17,8 +17,8 @@ module xnor_pc_all_masked #(
 // Pipeline valid shift register
     reg [4:0] valid_pipe;
 
-    always @(posedge clk or posedge rst) begin
-        if (rst) begin
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
             valid_pipe <= 5'b0;
             valid_out  <= 1'b0;
         end else begin
@@ -44,8 +44,8 @@ module xnor_pc_all_masked #(
 //register shares for timing separation (improves security)
     reg [N-1:0] xnor1_reg, xnor2_reg;
 
-    always @(posedge clk or posedge rst) begin
-        if (rst) begin
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
             xnor1_reg <= 0;
             xnor2_reg <= 0;
         end else if (valid_in) begin
@@ -80,28 +80,28 @@ module xnor_pc_all_masked #(
 
     wire car0_s0, car0_s1;
     and_masked ha0_carry (
-        .clk(clk), .rst(rst),
+        .clk(clk), .rst_n(rst_n),
         .a0(xnor_s0[0]), .a1(xnor_s1[0]), .b0(xnor_s0[1]), .b1(xnor_s1[1]),
         .r(r_add[0]), .c0(car0_s0), .c1(car0_s1)
     );
 
     wire car1_s0, car1_s1;
     and_masked ha1_carry (
-        .clk(clk), .rst(rst),
+        .clk(clk), .rst_n(rst_n),
         .a0(xnor_s0[2]), .a1(xnor_s1[2]), .b0(xnor_s0[3]), .b1(xnor_s1[3]),
         .r(r_add[1]), .c0(car1_s0), .c1(car1_s1)
     );
 
     wire car2_s0, car2_s1;
     and_masked ha2_carry (
-        .clk(clk), .rst(rst),
+        .clk(clk), .rst_n(rst_n),
         .a0(xnor_s0[4]), .a1(xnor_s1[4]), .b0(xnor_s0[5]), .b1(xnor_s1[5]),
         .r(r_add[2]), .c0(car2_s0), .c1(car2_s1)
     );
 
     wire car3_s0, car3_s1;
     and_masked ha3_carry (
-        .clk(clk), .rst(rst),
+        .clk(clk), .rst_n(rst_n),
         .a0(xnor_s0[6]), .a1(xnor_s1[6]), .b0(xnor_s0[7]), .b1(xnor_s1[7]),
         .r(r_add[3]), .c0(car3_s0), .c1(car3_s1)
     );
@@ -111,8 +111,8 @@ module xnor_pc_all_masked #(
     reg [3:0] sum1 [0:3];
     integer i;
 
-    always @(posedge clk or posedge rst) begin
-        if (rst) begin
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
             for (i = 0; i < 4; i = i + 1) begin
                 sum0[i] <= 4'b0;
                 sum1[i] <= 4'b0;
@@ -138,8 +138,8 @@ module xnor_pc_all_masked #(
                      + ((car0_s0 ^ car0_s1) << 1) + ((car1_s0 ^ car1_s1) << 1)
                      + ((car2_s0 ^ car2_s1) << 1) + ((car3_s0 ^ car3_s1) << 1);
 
-    always @(posedge clk or posedge rst) begin
-        if (rst) begin
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
             out <= 0;
         end else begin
             out <= final_sum;

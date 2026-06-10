@@ -3,7 +3,7 @@ module and_masked (
     input  wire a0, a1,
     input  wire b0, b1,
     input  wire r,
-    input  wire rst,
+    input  wire rst_n,
     output reg  c0,
     output reg  c1
 );
@@ -18,8 +18,8 @@ module and_masked (
 
     //1
     reg r1, and001, and011, and101, and111;
-    always @(posedge clk or posedge rst) begin
-        if (rst) begin
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
             r1 <= 0;
             and001 <= 0;
             and011 <= 0;
@@ -38,8 +38,8 @@ module and_masked (
 
     //2
     reg r2, and002, and102, and112;
-    always @(posedge clk or posedge rst) begin
-        if (rst) begin
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
             r2 <= 0;
             and002 <= 0;
             and102 <= 0;
@@ -56,8 +56,8 @@ module and_masked (
 
     //3
     reg r3, and003, and113;
-    always @(posedge clk or posedge rst) begin
-        if (rst) begin
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
             r3 <= 0;
             and003 <= 0;
             and113 <= 0;
@@ -71,8 +71,8 @@ module and_masked (
     wire xor4 = and003 ^ and113;
 
     //4
-    always @(posedge clk or posedge rst) begin
-        if (rst) begin
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
             c0 <= 0;
             c1 <= 0;
         end else begin

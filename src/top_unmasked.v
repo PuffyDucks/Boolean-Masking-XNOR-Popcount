@@ -44,7 +44,7 @@ localparam RECV_A  = 2'd0,
 
 reg  [1:0] state = 2'd0;
 reg  [7:0] a_buf;
-reg  [7:0] w_buf;
+reg  [7:0] act, wt;
 wire [3:0] out;
 
 reg TIO4 = 1'b0;
@@ -54,9 +54,9 @@ xnor_pc #(
     .N(8)
 ) u_xnor_popcnt (
     .clk  (iCE40CW312_CLK),
-    .rstn (1'b1),
-    .act  (a_buf),
-    .wt   (w_buf),
+    .rst_n (1'b1),
+    .act  (act),
+    .wt   (wt),
     .out  (out)
 );
 
@@ -71,7 +71,8 @@ always @(posedge iCE40CW312_CLK) begin
             end
         RECV_W:
             if (rx_valid && rx_cmd == CHAR_w) begin
-                w_buf <= rx_data;
+                wt    <= rx_data;
+                act   <= a_buf;
                 state <= CALC_O;
                 TIO4  <= 1'b1;
             end

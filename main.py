@@ -6,29 +6,33 @@ app = marimo.App(width="medium")
 
 @app.cell
 def _():
+    import numpy as np
     import marimo as mo
-    import chipwhisperer as cw
-    from chipwhisperer.hardware.naeusb.programmer_targetfpga import LatticeICE40
+    import matplotlib.pyplot as plt
     import time
 
-    return LatticeICE40, cw, time
+    def xnor_popcount(a, b):
+        return (~(a^b) & 0xFF).bit_count()
+
+    return mo, np, plt, time, xnor_popcount
 
 
 @app.cell
-def _(cw, time):
+def _(time):
+    import chipwhisperer as cw
     scope = cw.scope()
     if not scope._is_husky:
         raise TypeError("Scope is not ChipWhisperer-Husky")
 
     scope.default_setup()
-    scope.adc.samples = 80
+    scope.adc.samples = 30
     scope.adc.offset = 0
     scope.adc.basic_mode = "rising_edge"
     scope.trigger.triggers = "tio4"
     scope.io.tio1 = "serial_rx"
     scope.io.tio2 = "serial_tx"
     scope.io.hs2 = 'clkgen'
-    scope.gain.db = 50
+    scope.gain.db = 15
     scope.clock.clkgen_freq = 7372800 # 7.3728 MHz
     scope.clock.clkgen_src = 'system'
     scope.clock.adc_mul = 4
@@ -36,7 +40,7 @@ def _(cw, time):
 
     target = cw.target(scope, cw.targets.SimpleSerial)
 
-    for i in range(5):
+    for _ in range(5):
         scope.clock.reset_adc()
         time.sleep(1)
         if scope.clock.adc_locked:
@@ -46,24 +50,80 @@ def _(cw, time):
 
 
 @app.cell
-def _(LatticeICE40, scope, target):
+def _(scope):
+    from chipwhisperer.hardware.naeusb.programmer_targetfpga import LatticeICE40
     fpga = LatticeICE40(scope)
     fpga.erase_and_init()
     fpga.program("build/module.bin", sck_speed=20e6, use_fast_usb=True, start=True)
     print("Bitstream flashed")
+    return
 
-    test_a = [0x00, 0xFF, 0x55, 0x55, 0x13, 0x37]
-    test_w = [0x00, 0xFF, 0xAA, 0x44, 0xCA, 0xFE]
 
-    rows = []
-    for (a, w) in zip(test_a, test_w):
+@app.cell
+def _(mo, np, scope, target, xnor_popcount):
+    activations = []
+    traces = []
+    N = 5000
+
+    # secret_w = np.random.randint(0, 256, dtype=np.uint8)
+    secret_w = 0x4C
+
+    for _ in mo.status.progress_bar(range(N), subtitle='Running trace captures...', 
+                                    show_eta=True, show_rate=True):
+        a = np.random.randint(0, 256, dtype=np.uint8)
+
+        scope.arm()
         target.simpleserial_write('a', bytearray([a]))
-        target.simpleserial_write('w', bytearray([w]))
-        response = target.simpleserial_read('o', 1, ack=False)
-    
-        out = int.from_bytes(response)
-        expected = (~(a^w) & 0xFF).bit_count()
-        print(f"A: {a:02X}, W: {w:02X}, OUT: {out:02X}, EXPECTED: {expected:02X}, {"PASSED" if (expected == out) else "FAILED"}")
+        target.simpleserial_write('w', bytearray([secret_w]))
+
+        ret = scope.capture()
+        if ret: raise TimeoutError()
+
+        result = target.simpleserial_read('o', 1, ack=False)
+        out = result[0] if result else None
+        if (out != xnor_popcount(a, secret_w)):
+            raise ValueError
+
+        activations.append(a)
+        traces.append(scope.get_last_trace())
+
+    activations = np.array(activations)
+    traces = np.array(traces)
+    return N, activations, traces
+
+
+@app.cell
+def _(N, mo):
+    slider = mo.ui.slider(start=0, stop=N-1, label="Trace", value=0)
+    return (slider,)
+
+
+@app.cell
+def _(mo, np, plt, slider, traces):
+    xrange = np.arange(len(traces[slider.value]))
+    plt.plot(xrange, traces[slider.value])
+    ax = mo.ui.matplotlib(plt.gca())
+
+
+    mo.vstack([ax, slider])
+    return
+
+
+@app.cell
+def _(activations, np, traces, xnor_popcount):
+    corr_coeffs = []
+    for w in range(256):
+        predictions = [xnor_popcount(a, w) for a in activations]
+        trace_means = np.mean(traces, axis=1)
+        (_, _), (r, _) = np.corrcoef(predictions, trace_means)
+        corr_coeffs.append(r)
+
+    top_indices = np.argsort(corr_coeffs)[-3:]
+    top_coeffs = np.array(corr_coeffs)[top_indices]
+
+    print(top_coeffs)
+    for w in top_indices:
+        print(f"0x{w:02X}")
     return
 
 

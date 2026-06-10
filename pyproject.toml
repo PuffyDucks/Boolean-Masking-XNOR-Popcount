@@ -5,6 +5,7 @@ requires-python = ">=3.13"
 dependencies = [
     "chipwhisperer",
     "marimo>=0.23.9",
+    "matplotlib>=3.10.9",
 ]
 
 [tool.uv.workspace]

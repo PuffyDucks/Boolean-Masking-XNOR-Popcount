@@ -1,15 +1,11 @@
 `default_nettype none
 
-// Receive 'n' command, NOT the data byte, respond with 'o'
 module top (
-    input  wire iCE40CW312_CLK,
-    input  wire iCE40CW312_RX,
-    output wire iCE40CW312_TX
+    input  wire       iCE40CW312_CLK,
+    input  wire       iCE40CW312_RX,
+    output wire       iCE40CW312_TX,
+    output wire [1:0] iCE40CW312_GPIO_O
 );
-
-localparam CHAR_a = 8'h61;
-localparam CHAR_w = 8'h77;
-localparam CHAR_o = 8'h6F;
 
 wire        rx_valid;
 wire [7:0]  rx_cmd;
@@ -37,6 +33,10 @@ simpleserial_iface #(
     .tx_busy (tx_busy)
 );
 
+localparam CHAR_a = 8'h61,
+           CHAR_w = 8'h77,
+           CHAR_o = 8'h6F;
+
 localparam RECV_A  = 2'd0,
            RECV_W  = 2'd1,
            CALC_O  = 2'd2,
@@ -46,6 +46,9 @@ reg  [1:0] state = 2'd0;
 reg  [7:0] a_buf;
 reg  [7:0] w_buf;
 wire [3:0] out;
+
+reg TIO4 = 1'b0;
+assign iCE40CW312_GPIO_O = {TIO4, 1'b0};
 
 xnor_popcnt #(
     .N(8)
@@ -59,6 +62,7 @@ xnor_popcnt #(
 
 always @(posedge iCE40CW312_CLK) begin
     tx_valid <= 1'b0;
+    TIO4  <= 1'b0;
     case (state)
         RECV_A:
             if (rx_valid && rx_cmd == CHAR_a) begin
@@ -69,9 +73,12 @@ always @(posedge iCE40CW312_CLK) begin
             if (rx_valid && rx_cmd == CHAR_w) begin
                 w_buf <= rx_data;
                 state <= CALC_O;
+                TIO4  <= 1'b1;
             end
-        CALC_O:
+        CALC_O: begin
             state <= SEND_O;
+            TIO4  <= 1'b0;
+        end
         SEND_O: 
             if (!tx_busy) begin
                 tx_cmd   <= CHAR_o;

@@ -1,6 +1,6 @@
 `default_nettype none
 
-module top (
+module top_unmasked (
     input  wire       iCE40CW312_CLK,
     input  wire       iCE40CW312_RX,
     output wire       iCE40CW312_TX,

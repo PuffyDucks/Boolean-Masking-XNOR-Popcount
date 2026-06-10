@@ -1,13 +1,12 @@
 PROJ      = module
-TOP       = top
+TOP       = top_unmasked
 DEVICE    = up5k
 PACKAGE   = uwg30
 
-SRC_DIR   = src
 BUILD_DIR = build
 
-SOURCES   = $(wildcard $(SRC_DIR)/*.v)
-PCF       = $(SRC_DIR)/constraints.pcf
+SRCS      = $(wildcard ./src/*.v) $(wildcard ./src/*/*.v)
+PCF       = ./src/constraints.pcf
 
 JSON      = $(BUILD_DIR)/$(PROJ).json
 ASC       = $(BUILD_DIR)/$(PROJ).asc
@@ -20,8 +19,8 @@ all: $(BIN)
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-$(JSON): $(SOURCES) | $(BUILD_DIR)
-	yosys -p "synth_ice40 -top $(TOP) -json $@" $(SOURCES)
+$(JSON): $(SRCS) | $(BUILD_DIR)
+	yosys -p "synth_ice40 -top $(TOP) -json $@" $(SRCS)
 
 $(ASC): $(JSON) $(PCF)
 	nextpnr-ice40 --$(DEVICE) --package $(PACKAGE) \
@@ -40,7 +39,7 @@ SIM_FST = $(SIM_DIR)/tb_top.fst
 
 sim: $(SIM_FST)
 
-$(SIM_VVP): $(SIM_DIR)/tb_top.v $(SOURCES) | $(SIM_DIR)
+$(SIM_VVP): $(SIM_DIR)/tb_top.v $(SRCS) | $(SIM_DIR)
 	iverilog -g2012 -Wall -o $@ $^
 
 $(SIM_FST): $(SIM_VVP)

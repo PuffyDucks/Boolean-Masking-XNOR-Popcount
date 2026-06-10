@@ -4,6 +4,22 @@ __generated_with = "0.23.9"
 app = marimo.App(width="medium")
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    # Correlation Power Analysis on XNOR-Popcount Operations
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ChipWhisperer Husky and ADC Configuration
+    """)
+    return
+
+
 @app.cell
 def _():
     import numpy as np
@@ -49,6 +65,14 @@ def _(time):
     return scope, target
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Bitstream Flashing
+    """)
+    return
+
+
 @app.cell
 def _(scope):
     from chipwhisperer.hardware.naeusb.programmer_targetfpga import LatticeICE40
@@ -59,14 +83,21 @@ def _(scope):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Running Traces
+    """)
+    return
+
+
 @app.cell
 def _(mo, np, scope, target, xnor_popcount):
     activations = []
     traces = []
     N = 5000
 
-    # secret_w = np.random.randint(0, 256, dtype=np.uint8)
-    secret_w = 0x4C
+    secret_w = 0x29
 
     for _ in mo.status.progress_bar(range(N), subtitle='Running trace captures...', 
                                     show_eta=True, show_rate=True):
@@ -89,12 +120,12 @@ def _(mo, np, scope, target, xnor_popcount):
 
     activations = np.array(activations)
     traces = np.array(traces)
-    return N, activations, traces
+    return N, activations, secret_w, traces
 
 
 @app.cell
 def _(N, mo):
-    slider = mo.ui.slider(start=0, stop=N-1, label="Trace", value=0)
+    slider = mo.ui.slider(start=0, stop=N-1, label="Trace", value=0, full_width=True)
     return (slider,)
 
 
@@ -102,15 +133,17 @@ def _(N, mo):
 def _(mo, np, plt, slider, traces):
     xrange = np.arange(len(traces[slider.value]))
     plt.plot(xrange, traces[slider.value])
+    plt.title(f"Power trace {slider.value}")
+    plt.ylabel("ADC Measurement")
+    plt.xlabel("Sample")
     ax = mo.ui.matplotlib(plt.gca())
-
 
     mo.vstack([ax, slider])
     return
 
 
 @app.cell
-def _(activations, np, traces, xnor_popcount):
+def _(activations, np, secret_w, traces, xnor_popcount):
     corr_coeffs = []
     for w in range(256):
         predictions = [xnor_popcount(a, w) for a in activations]
@@ -118,12 +151,14 @@ def _(activations, np, traces, xnor_popcount):
         (_, _), (r, _) = np.corrcoef(predictions, trace_means)
         corr_coeffs.append(r)
 
-    top_indices = np.argsort(corr_coeffs)[-3:]
+    top_indices = np.argsort(corr_coeffs)[-10:][::-1]
     top_coeffs = np.array(corr_coeffs)[top_indices]
 
-    print(top_coeffs)
-    for w in top_indices:
-        print(f"0x{w:02X}")
+    print(f"Extracted weight: 0x{top_indices[0]:02X}")
+    print(f"Correct weight: 0x{secret_w:02X}")
+    # print(top_coeffs)
+    # print([f"0x{w:02X}" for w in top_indices])
+
     return
 
 

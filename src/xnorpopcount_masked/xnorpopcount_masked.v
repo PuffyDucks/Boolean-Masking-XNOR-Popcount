@@ -11,7 +11,7 @@ module xnorpopcount_masked #(
     input  wire [N-1:0]          r_xnor,
     input  wire [7:0]            r_add,
     output reg                   valid_out,
-    output reg  [$clog2(N+1)-1:0] mac_out
+    output reg  [$clog2(N+1)-1:0] out
 );
 
 // Pipeline valid shift register
@@ -132,23 +132,18 @@ module xnorpopcount_masked #(
         end
     end
 
-    wire [3:0] sum_unmasked, car_unmasked;
-    assign sum_unmasked = sum0[3] ^ sum1[3];
-    assign car_unmasked = {car3_s0 ^ car3_s1,
-                     car2_s0 ^ car2_s1,
-                     car1_s0 ^ car1_s1,
-                     car0_s0 ^ car0_s1};
-
     wire [$clog2(N+1)-1:0] final_sum;
-    assign final_sum = sum_unmasked[0] + sum_unmasked[1] + sum_unmasked[2] + sum_unmasked[3]
-                     + (car_unmasked[0] << 1) + (car_unmasked[1] << 1)
-                     + (car_unmasked[2] << 1) + (car_unmasked[3] << 1);
+    assign final_sum = (sum0[3][0] ^ sum1[3][0]) + (sum0[3][1] ^ sum1[3][1])
+                     + (sum0[3][2] ^ sum1[3][2]) + (sum0[3][3] ^ sum1[3][3])
+                     + ((car0_s0 ^ car0_s1) << 1) + ((car1_s0 ^ car1_s1) << 1)
+                     + ((car2_s0 ^ car2_s1) << 1) + ((car3_s0 ^ car3_s1) << 1);
 
     always @(posedge clk or posedge rst) begin
         if (rst) begin
-            mac_out <= 0;
+            out <= 0;
         end else begin
-            mac_out <= final_sum;
+            out <= final_sum;
         end
     end
 endmodule
+

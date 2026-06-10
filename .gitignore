@@ -1,0 +1,5 @@
+__marimo__
+*.vcd
+*.vvp
+build/*.asc
+build/*.json

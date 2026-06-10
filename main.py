@@ -52,16 +52,15 @@ def _(LatticeICE40, scope, target):
     fpga.program("build/module.bin", sck_speed=20e6, use_fast_usb=True, start=True)
     print("Bitstream flashed")
 
-    # test_cases = [0x00, 0xFF, 0xAA, 0x55, 0x12, 0xF0]
-    test_cases = [0x00]
+    test_cases = [0x00, 0xFF, 0xAA, 0x55, 0x12, 0xF0]
     rows = []
     for byte_in in test_cases:
         expected = (~byte_in) & 0xFF
         target.simpleserial_write('n', bytearray([byte_in]))
     
-        # response = target.simpleserial_read('o', 1)
-        # actual = response[0] if response else None
-        # print(f"IN: {byte_in:02X}, OUT: {actual}, EXPECTED: {expected:02X}")
+        response = target.simpleserial_read('o', 1, ack=False)
+        byte_out = int.from_bytes(response)
+        print(f"IN: {byte_in:02X}, OUT: {byte_out:02X}, EXPECTED: {expected:02X}, {"PASSED" if (expected == byte_out) else "FAILED"}")
     return
 
 

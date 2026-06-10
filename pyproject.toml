@@ -1,0 +1,16 @@
+[project]
+name = "eec289q"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "chipwhisperer",
+    "marimo>=0.23.9",
+]
+
+[tool.uv.workspace]
+members = [
+    "chipwhisperer",
+]
+
+[tool.uv.sources]
+chipwhisperer = { workspace = true }
